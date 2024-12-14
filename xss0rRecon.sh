@@ -200,10 +200,10 @@ install_tools() {
     sudo apt update
     sudo apt update --fix-missing
     sudo apt install pip
-    sudo pip install colorama
-    pip install aiodns
-    pip install aiofiles
-    sudo pip install uvloop
+    sudo pip install colorama --break-system-packages
+    pip install aiodns --break-system-packages
+    pip install aiofiles --break-system-packages
+    sudo pip install uvloop --break-system-packages
     sudo apt --fix-broken install
     sudo apt install -y python3 python3-pip python3-venv python3-setuptools git wget curl
     sudo apt-mark hold google-chrome-stable
@@ -222,7 +222,8 @@ install_tools() {
     python3 -m venv env
 
     # Upgrade pip in virtual environment
-    sudo pip install --upgrade pip
+    sudo pip install --upgrade pip 
+    pip install tldextract --break-system-packages
     sudo pip install structlog requests uvloop setuptools pipx
 
     # Install necessary Python packages within the virtual environment
@@ -275,7 +276,7 @@ install_tools() {
     show_progress "Installing/Upgrading pip"
     sudo apt update && sudo apt install python3-pip -y
     sudo pip3 install --upgrade pip --root-user-action=ignore
-    sudo pip install tldextract
+    sudo pip install tldextract --break-system-packages
     echo "managed by system package manager" | sudo tee /usr/lib/python3.12/EXTERNALLY-MANAGED
     sleep 3
 
@@ -621,7 +622,7 @@ fi
 
 # Attempt to install URLFinder using 'go install'
 echo -e "${BOLD_WHITE}Attempting to install URLFinder using 'go install'...${NC}"
-if sudo go install -v github.com/projectdiscovery/urlfinder/cmd/urlfinder@latest; then
+if go install -v github.com/projectdiscovery/urlfinder/cmd/urlfinder@latest; then
     echo -e "${BOLD_BLUE}URLFinder installed successfully via 'go install'.${NC}"
 
     # Copy the binary to /usr/local/bin for system-wide access
@@ -757,7 +758,7 @@ else
     echo -e "${YELLOW}Failed to install Gau via 'go install'. Attempting to install from source...${NC}"
 
     # Clone the Gau repository
-    git clone https://github.com/lc/gau.git
+    git clone https://github.com/lc/gau
     cd gau/cmd/gau
 
     # Build the Gau binary
@@ -774,6 +775,65 @@ else
         exit 1
     fi
 fi
+
+# Attempt to install Katana using 'go install'
+echo -e "${BOLD_WHITE}Attempting to install Katana using 'go install'...${NC}"
+if go install github.com/projectdiscovery/katana/cmd/katana@latest; then
+    echo -e "${BOLD_BLUE}Katana installed successfully via 'go install'.${NC}"
+
+    # Copy the binary to /usr/local/bin for system-wide access
+    sudo cp "$(go env GOPATH)/bin/katana" /usr/local/bin/
+else
+    echo -e "${YELLOW}Failed to install Katana via 'go install'. Attempting to install from source...${NC}"
+
+    # Clone the Katana repository
+    git clone https://github.com/projectdiscovery/katana.git
+    cd katana/cmd/katana
+
+    # Build the Katana binary
+    if go build; then
+        chmod +x katana
+        sudo mv katana /usr/local/bin/
+        echo -e "${BOLD_BLUE}Katana installed successfully from source.${NC}"
+        cd ../../..
+        sudo rm -rf katana
+    else
+        echo -e "${RED}Failed to build Katana from source.${NC}"
+        cd ../../..
+        rm -rf katana
+        exit 1
+    fi
+fi
+
+# Attempt to install Waybackurls using 'go install'
+echo -e "${BOLD_WHITE}Attempting to install Waybackurls using 'go install'...${NC}"
+if go install github.com/tomnomnom/waybackurls@latest; then
+    echo -e "${BOLD_BLUE}Waybackurls installed successfully via 'go install'.${NC}"
+
+    # Copy the binary to /usr/local/bin for system-wide access
+    sudo cp "$(go env GOPATH)/bin/waybackurls" /usr/local/bin/
+else
+    echo -e "${YELLOW}Failed to install Waybackurls via 'go install'. Attempting to install from source...${NC}"
+
+    # Clone the Waybackurls repository
+    git clone https://github.com/tomnomnom/waybackurls.git
+    cd waybackurls
+
+    # Build the Waybackurls binary
+    if go build; then
+        chmod +x waybackurls
+        sudo mv waybackurls /usr/local/bin/
+        echo -e "${BOLD_BLUE}Waybackurls installed successfully from source.${NC}"
+        cd ..
+        sudo rm -rf waybackurls
+    else
+        echo -e "${RED}Failed to build Waybackurls from source.${NC}"
+        cd ..
+        rm -rf waybackurls
+        exit 1
+    fi
+fi
+
 
 # Ensure /usr/local/bin is in PATH
 if [[ ":$PATH:" != *":/usr/local/bin:"* ]]; then
