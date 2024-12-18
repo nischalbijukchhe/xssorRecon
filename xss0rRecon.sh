@@ -8,17 +8,6 @@ handle_error_with_solution() {
     echo -e "${BOLD_WHITE}$2${NC}"
 }
 
-# Copy katana, waybackurls, and gau to /usr/bin and /usr/local/bin
-for file in katana waybackurls gau; do
-    if [ -f "$file" ]; then
-        sudo cp "$file" /usr/bin || echo "Failed to copy $file to /usr/bin"
-        sudo cp "$file" /usr/local/bin || echo "Failed to copy $file to /usr/local/bin"
-        echo "Copied $file to /usr/bin and /usr/local/bin"
-    else
-        echo "File $file not found in the current directory."
-    fi
-done
-
 # Define colors
 BOLD_WHITE='\033[1;97m'
 BOLD_BLUE='\033[1;34m'
@@ -436,7 +425,7 @@ if ! command -v dnsbruter &> /dev/null; then
     # Final check to ensure dnsbruter is accessible globally
     if command -v dnsbruter &> /dev/null; then
         echo "Dnsbruter is successfully installed and globally available."
-        dnsbruter -h
+        dnsbruter -up && dnsbruter -h
     else
         echo "Dnsbruter installation failed. Please check the installation steps."
     fi
@@ -716,15 +705,6 @@ fi
 
 sleep 3
 
-    # Copy Katana Gau Wayback to /usr/local/bin and /usr/bin
-    sudo cp katana /usr/local/bin/
-    sudo cp katana /usr/bin/
-    sudo cp gau /usr/local/bin/
-    sudo cp gau /usr/bin/
-    sudo cp waybackurls /usr/local/bin/
-    sudo cp waybackurls /usr/bin/
-    sleep 3
-
 
     # Step 11: Install Gau
     show_progress "Installing Gau"
@@ -884,6 +864,7 @@ sleep 3
     sudo apt install -y tmux
     sudo apt --fix-broken install
     sudo apt update
+    dnsbruter -up
     sleep 3
 
     # Set specific permissions for installed tools
@@ -893,6 +874,7 @@ sleep 3
     sudo chmod 755 /usr/local/bin/uro
     sudo chmod 755 /usr/local/bin/gospider
     sudo chmod 755 /usr/local/bin/hakrawler
+    sudo chmod 755 /usr/local/bin/urlfinder
 
     # Display installed tools
     echo -e "${BOLD_BLUE}All tools have been successfully installed.${NC}"
@@ -985,63 +967,79 @@ echo -e "\n\n"
 # Function to run step 3 (Domain Enumeration and Filtering)
 run_step_3() {
     echo -e "${BOLD_WHITE}You selected: Domain Enumeration and Filtering for $domain_name${NC}"
-                
-    # Step 1: Passive FUZZ domains with wordlist
-    show_progress "Passive FUZZ domains with wordlist"
-    dnsbruter -d "$domain_name" -w subs-dnsbruter-small.txt -c 50 -wt 100 -o output-dnsbruter.txt -ws wild.txt || handle_error "dnsbruter"
-    sleep 5
+    echo -e "${BOLD_WHITE}Do you want to use your own list of domains or xss0rRecon to find it for you? Enter Y for your list or N for xss0rRecon list - domain list must be in format ${domain_name}-domains.txt: ${NC}"
+    read user_choice
 
-    # Step 2: Active brute crawling domains
-    show_progress "Active brute crawling domains"
-    subdominator -d "$domain_name" -o output-subdominator.txt || handle_error "subdominator"
-    sleep 5
+    # Convert user input to uppercase
+    user_choice=$(echo "$user_choice" | tr '[:lower:]' '[:upper:]')
 
-    # Step 3: Checking if output-dnsbruter.txt was created
-    if [ ! -f "output-dnsbruter.txt" ]; then
-        echo "Error: output-dnsbruter.txt not found. The dnsbruter command may have failed."
-        
-        # If dnsbruter failed, use only subdominator output
-        if [ -f "output-subdominator.txt" ]; then
-            echo "Moving output-subdominator.txt to ${domain_name}-domains.txt"
-            mv output-subdominator.txt "${domain_name}-domains.txt"
+    if [[ "$user_choice" == "Y" ]]; then
+        if [ -f "${domain_name}-domains.txt" ]; then
+            echo -e "${BOLD_WHITE}Using your provided list of domains from ${domain_name}-domains.txt${NC}"
+            proceed_with_existing_file "${domain_name}-domains.txt"
         else
-            echo "Error: output-subdominator.txt not found. The subdominator command may have also failed."
+            echo -e "${RED}Error: File ${domain_name}-domains.txt not found. Please ensure the file is in the current directory.${NC}"
             exit 1
         fi
-    else
-        # Check if output-subdominator.txt exists, and if both exist, merge the results
-        if [ -f "output-subdominator.txt" ]; then
-            # Step 4: Merging passive and active results into one file
-            show_progress "Merging passive and active results into one file"
-            cat output-dnsbruter.txt output-subdominator.txt > "${domain_name}-domains.txt" || handle_error "Merging domains"
+    elif [[ "$user_choice" == "N" ]]; then
+        # Step 1: Passive FUZZ domains with wordlist
+        show_progress "Passive FUZZ domains with wordlist"
+        dnsbruter -d "$domain_name" -w subs-dnsbruter-small.txt -c 90 -wt 80 -rt 500 -wd -ws wild.txt -o output-dnsbruter.txt || handle_error "dnsbruter"
+        sleep 5
+
+        # Step 2: Active brute crawling domains
+        show_progress "Active brute crawling domains"
+        subdominator -d "$domain_name" -o output-subdominator.txt || handle_error "subdominator"
+        sleep 5
+
+        # Step 3: Checking if output-dnsbruter.txt was created
+        if [ ! -f "output-dnsbruter.txt" ]; then
+            echo "Error: output-dnsbruter.txt not found. The dnsbruter command may have failed."
+            if [ -f "output-subdominator.txt" ]; then
+                echo "Moving output-subdominator.txt to ${domain_name}-domains.txt"
+                mv output-subdominator.txt "${domain_name}-domains.txt"
+            else
+                echo "Error: output-subdominator.txt not found. The subdominator command may have also failed."
+                exit 1
+            fi
         else
-            echo "Error: output-subdominator.txt not found. Proceeding with output-dnsbruter.txt only."
-            mv output-dnsbruter.txt "${domain_name}-domains.txt"
+            if [ -f "output-subdominator.txt" ]; then
+                show_progress "Merging passive and active results into one file"
+                cat output-dnsbruter.txt output-subdominator.txt > "${domain_name}-domains.txt" || handle_error "Merging domains"
+            else
+                echo "Error: output-subdominator.txt not found. Proceeding with output-dnsbruter.txt only."
+                mv output-dnsbruter.txt "${domain_name}-domains.txt"
+            fi
         fi
-    fi
 
-    # Show total subdomains after merging
-    total_subdomains=$(wc -l < "${domain_name}-domains.txt")
-    echo -e "${RED}Total subdomains after processing: $total_subdomains${NC}"
-    sleep 5
-
-    # Step 5: Removing old temporary files
-    show_progress "Removing old temporary files"
-    if [ -f "output-dnsbruter.txt" ]; then
-        rm output-dnsbruter.txt || handle_error "Removing output-dnsbruter.txt"
+        # Step 4: Removing old temporary files
+        show_progress "Removing old temporary files"
+        [ -f "output-dnsbruter.txt" ] && rm output-dnsbruter.txt || handle_error "Removing output-dnsbruter.txt"
+        [ -f "output-subdominator.txt" ] && rm output-subdominator.txt || handle_error "Removing output-subdominator.txt"
+        sleep 3
+    else
+        echo -e "${RED}Invalid choice entered. Please run the script again and choose Y or N.${NC}"
+        exit 1
     fi
-    if [ -f "output-subdominator.txt" ]; then
-        rm output-subdominator.txt || handle_error "Removing output-subdominator.txt"
-    fi
-    sleep 3
 
     # Step 6: Removing duplicate domains
     show_progress "Removing duplicate domains"
-    initial_count=$(wc -l < "${domain_name}-domains.txt")
-    awk '{sub(/^https?:\/\//, "", $0); sub(/^www\./, "", $0); if (!seen[$0]++) print}' "${domain_name}-domains.txt" > "unique-${domain_name}-domains.txt" || handle_error "Removing duplicates"
-    final_count=$(wc -l < "unique-${domain_name}-domains.txt")
+    remove_duplicates "${domain_name}-domains.txt"
+}
+
+proceed_with_existing_file() {
+    file_path=$1
+    echo -e "${RED}Proceeding with file: $file_path${NC}"
+    remove_duplicates "$file_path"
+}
+
+remove_duplicates() {
+    file_path=$1
+    initial_count=$(wc -l < "$file_path")
+    awk '{sub(/^https?:\/\//, "", $0); sub(/^www\./, "", $0); if (!seen[$0]++) print}' "$file_path" > "unique-$file_path"
+    final_count=$(wc -l < "unique-$file_path")
     removed_count=$((initial_count - final_count))
-    echo -e "${RED}Removed $removed_count duplicate domains.${NC}"
+    echo -e "${RED}Removed $removed_count duplicate domains. Total subdomains after processing: $final_count${NC}"
     sleep 3
 
     # Step 6.1: Removing old domain list
@@ -1185,7 +1183,7 @@ while IFS= read -r domain || [[ -n "$domain" ]]; do
         processed_count=$((processed_count + 1))
         echo "Processing $processed_count/$total_domains: $domain"
         output_file="$output_folder/output-${domain//BRUT/}.txt"
-        sudo dnsbruter -d "$domain" -w "$wordlist_file" -c 20 -wt 100 -o "$output_file" -ws "$output_folder/wild-${domain//BRUT/}.txt"
+        dnsbruter -d "$domain" -w "$wordlist_file" -c 90 -wt 80 -wt 80 -rt 500 -wd -ws wild.txt -o "$output_file" -ws "$output_folder/wild-${domain//BRUT/}.txt"
         if [[ $? -ne 0 ]]; then
             echo "Error occurred while running dnsbruter for $domain."
         else
