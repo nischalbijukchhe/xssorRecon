@@ -966,6 +966,19 @@ echo -e "\n\n"
 
 # Function to run step 3 (Domain Enumeration and Filtering)
 run_step_3() {
+    # Check if the user wants to skip the order check for step 3
+    if [ "$skip_order_check_for_option_4" = true ]; then
+        echo -e "${BOLD_BLUE}Skipping step 3 order check and directly using the domain list provided...${NC}"
+        if [ -f "${domain_name}-domains.txt" ]; then
+            echo -e "${BOLD_WHITE}Using your provided list of domains from ${domain_name}-domains.txt${NC}"
+            proceed_with_existing_file "${domain_name}-domains.txt"
+        else
+            echo -e "${RED}Error: File ${domain_name}-domains.txt not found. Please ensure the file is in the current directory.${NC}"
+            exit 1
+        fi
+        return
+    fi
+
     echo -e "${BOLD_WHITE}You selected: Domain Enumeration and Filtering for $domain_name${NC}"
     echo -e "${BOLD_WHITE}Do you want to use your own list of domains or xss0rRecon to find it for you? Enter Y for your list or N for xss0rRecon list - domain list must be in format ${domain_name}-domains.txt: ${NC}"
     read user_choice
@@ -976,7 +989,48 @@ run_step_3() {
     if [[ "$user_choice" == "Y" ]]; then
         if [ -f "${domain_name}-domains.txt" ]; then
             echo -e "${BOLD_WHITE}Using your provided list of domains from ${domain_name}-domains.txt${NC}"
-            proceed_with_existing_file "${domain_name}-domains.txt"
+            # Skip directly to the Y/N prompt for continuing the scan
+            read -p "$(echo -e "${BOLD_WHITE}Your domain file has been created. Would you like to continue scanning your target domain, including all its subdomains? If so, please enter 'Y'. If you prefer to modify the domain file first, so you can delete these and add your domains, enter 'N', and you can manually proceed with step 4 afterwards. Do you want to continue scanning with all subdomains (Y/N)?: ${NC}")" continue_scan
+            if [[ "$continue_scan" =~ ^[Yy]$ ]]; then
+                # Step xx: Filtering ALIVE DOMAINS
+                show_progress "Filtering ALIVE DOMAINS"
+                subprober -f "${domain_name}-domains.txt" -sc -ar -o "${domain_name}-alive" -nc -c 20 || handle_error "subprober"
+                sleep 5
+                rm -r "${domain_name}-domains.txt"
+                mv "${domain_name}-alive" "${domain_name}-domains.txt"
+
+                # Step xx: Filtering valid URLS
+                show_progress "Filtering valid DOMAINS"
+                grep -oP 'http[^\s]*' "${domain_name}-domains.txt" > ${domain_name}-valid || handle_error "grep valid urls"
+                sleep 5
+                rm -r "${domain_name}-domains.txt"
+                mv ${domain_name}-valid "${domain_name}-domains.txt"
+
+                # Step xx: Remove duplicates
+                show_progress "Removing duplicate domains"
+                initial_count=$(wc -l < "${domain_name}-domains.txt")
+                awk '{if (!seen[$0]++) print}' "${domain_name}-domains.txt" >> "subs-filtered.txt" || handle_error "Removing duplicates from ${domain_name}-domains.txt"
+                final_count_subs=$(wc -l < "subs-filtered.txt")
+                removed_count=$((initial_count - final_count_subs))
+                rm -r "${domain_name}-domains.txt"
+                mv "subs-filtered.txt" "${domain_name}-domains.txt"
+                echo -e "${RED}Removed $removed_count duplicate domains.${NC}"
+
+                # Normalize to `http://` and remove `www.`
+                awk '{sub(/^https?:\/\//, "http://", $0); sub(/^http:\/\/www\./, "http://", $0); domain = $0; if (!seen[domain]++) print domain}' \
+                "${domain_name}-domains.txt" > "final-${domain_name}-domains.txt" || handle_error "Final filtering"
+                rm -r "${domain_name}-domains.txt"
+                mv "final-${domain_name}-domains.txt" "${domain_name}-domains.txt"
+                sleep 5
+
+                skip_order_check_for_option_4=true
+                echo -e "${BOLD_BLUE}Automatically continuing with step 4: URL Crawling and Filtering...${NC}"
+                run_step_4  # Automatically continue to step 4
+            else
+                echo -e "${BOLD_WHITE}Please edit your file ${domain_name}-domains.txt and remove any unwanted subdomains before continuing.${NC}"
+                skip_order_check_for_option_4=true
+            fi
+            return
         else
             echo -e "${RED}Error: File ${domain_name}-domains.txt not found. Please ensure the file is in the current directory.${NC}"
             exit 1
@@ -984,7 +1038,7 @@ run_step_3() {
     elif [[ "$user_choice" == "N" ]]; then
         # Step 1: Passive FUZZ domains with wordlist
         show_progress "Passive FUZZ domains with wordlist"
-        dnsbruter -d "$domain_name" -w subs-dnsbruter-small.txt -c 90 -wt 80 -rt 500 -wd -ws wild.txt -o output-dnsbruter.txt || handle_error "dnsbruter"
+        dnsbruter -d "$domain_name" -w subs-dnsbruter-small.txt -c 150 -wt 80 -rt 500 -wd -ws wild.txt -o output-dnsbruter.txt || handle_error "dnsbruter"
         sleep 5
 
         # Step 2: Active brute crawling domains
@@ -1011,7 +1065,6 @@ run_step_3() {
                 mv output-dnsbruter.txt "${domain_name}-domains.txt"
             fi
         fi
-
         # Step 4: Removing old temporary files
         show_progress "Removing old temporary files"
         [ -f "output-dnsbruter.txt" ] && rm output-dnsbruter.txt || handle_error "Removing output-dnsbruter.txt"
@@ -1049,7 +1102,7 @@ remove_duplicates() {
 
   # Step 7: Filtering ALIVE domain names
 show_progress "Filtering ALIVE domain names"
-subprober -f "unique-${domain_name}-domains.txt" -sc -ar -o "subprober-${domain_name}-domains.txt" -nc -mc 200 301 302 307 308 403 401 -c 20 || handle_error "subprober"
+subprober -f "unique-${domain_name}-domains.txt" -sc -ar -o "subprober-${domain_name}-domains.txt" -nc -c 20 || handle_error "subprober"
 sleep 5
 
 # Step 7.1: Create subs-subs folder and set permissions
@@ -1146,24 +1199,6 @@ sudo chown "$(whoami):$(whoami)" "$brut_file"
 sudo chmod +x "$brut_file"
 echo "File '$brut_file' created successfully with BRUT. prefix added to all valid domains."
 
-# Step 7.6: Configure system resources for dnsbruter
-echo "Configuring system resources..."
-
-# Increase swap space
-sudo fallocate -l 4G /swapfile > /dev/null 2>&1
-sudo chmod 600 /swapfile > /dev/null 2>&1
-sudo mkswap /swapfile > /dev/null 2>&1
-sudo swapon /swapfile > /dev/null 2>&1
-echo "/swapfile none swap sw 0 0" | sudo tee -a /etc/fstab > /dev/null 2>&1
-
-# Increase file descriptor limit
-echo "* soft nofile 65535" | sudo tee -a /etc/security/limits.conf > /dev/null 2>&1
-echo "* hard nofile 65535" | sudo tee -a /etc/security/limits.conf > /dev/null 2>&1
-ulimit -n 65535
-
-# Adjust stack size if necessary
-ulimit -s 16384
-
 
 # Step 7.7: Run dnsbruter on the BRUT-prefixed domains
 wordlist_file="subs-dnsbruter-small.txt"
@@ -1177,16 +1212,26 @@ processed_count=0
 total_domains=$(wc -l < "$brut_file")
 echo "Total domains to process: $total_domains"
 
+# Dynamically determine the default folder using pwd
+default_folder=$(pwd)
+brut_log="$default_folder/BRUT.log"
+> "$brut_log"  # Clear the BRUT.log file if it exists
+
 while IFS= read -r domain || [[ -n "$domain" ]]; do
     domain=$(echo "$domain" | xargs)
     if [[ -n "$domain" ]]; then
         processed_count=$((processed_count + 1))
         echo "Processing $processed_count/$total_domains: $domain"
         output_file="$output_folder/output-${domain//BRUT/}.txt"
-        dnsbruter -d "$domain" -w "$wordlist_file" -c 90 -wt 80 -wt 80 -rt 500 -wd -ws wild.txt -o "$output_file" -ws "$output_folder/wild-${domain//BRUT/}.txt"
+        dnsbruter -d "$domain" -w "$wordlist_file" -c 150 -wt 80 -rt 500 -wd -ws wild.txt -o "$output_file" -ws "$output_folder/wild-${domain//BRUT/}.txt"
         if [[ $? -ne 0 ]]; then
             echo "Error occurred while running dnsbruter for $domain."
         else
+            # Count and log new domains discovered by dnsbruter
+            new_domains_count=$(wc -l < "$output_file")
+            echo "BRUT for $domain discovered $new_domains_count new domains."
+            echo "[$domain] Discovered: $new_domains_count new domains" >> "$brut_log"
+            
             echo "Completed dnsbruter for $domain. Output saved to $output_file"
         fi
     fi
@@ -1215,8 +1260,13 @@ echo -e "${CYAN}Number of new SUB-SUB domains added since normalization: ${new_d
 
 # Step 7.10: Move the final subs-subs.txt file to the default folder
 cd ..
-sudo mv "$output_folder/subs-subs.txt" "subs-subs.txt"
+sudo mv "$output_folder/subs-subs.txt" "$default_folder/subs-subs.txt"
 echo "Final file 'subs-subs.txt' moved to the default folder."
+
+# Step 7.11: Log message confirming BRUT.log saved to the default folder
+if [[ -f "$brut_log" ]]; then
+    echo "BRUT.log has been created and saved to the default folder: $default_folder"
+fi
 
 # Count and display the total number of subdomains found
 total_subdomains=$(wc -l < "subs-subs.txt")
@@ -1232,7 +1282,7 @@ sleep 3
 show_progress "Filtering ALIVE domain names"
 
 # Optimize SubProber execution with reduced concurrency and thread count
-subprober -f subs-subs.txt -sc -ar -o "subprober-${domain_name}-domains.txt" -nc -mc 200 301 302 307 308 403 401 -c 10 || handle_error "subprober"
+subprober -f subs-subs.txt -sc -ar -o "subprober-${domain_name}-domains.txt" -nc -c 20 || handle_error "subprober"
 
 # Sleep to allow the system to stabilize after intensive processing
 sleep 5
@@ -1270,17 +1320,25 @@ mv subs-subs.txt "${domain_name}-domains.txt" || handle_error "Renaming output f
 sleep 3
 
     # Step 9: Final filtering of unique domain names
-    show_progress "Last step filtering domains"
-    awk '{sub(/^https?:\/\//, "http://", $0); sub(/^www\./, "", $0); domain = $0; if (!seen[domain]++) print domain}' "${domain_name}-domains.txt" > "final-${domain_name}-domains.txt" || handle_error "Final filtering"
-    sleep 5
+show_progress "Last step filtering domains"
+
+# Normalize to `http://` and remove `www.`
+awk '{sub(/^https?:\/\//, "http://", $0); sub(/^http:\/\/www\./, "http://", $0); domain = $0; if (!seen[domain]++) print domain}' \
+"${domain_name}-domains.txt" > "final-${domain_name}-domains.txt" || handle_error "Final filtering"
+sleep 5
 
 # Step 10: Renaming final file to new file
 show_progress "Renaming final file to new file"
-mv "final-${domain_name}-domains.txt" "${domain_name}-domains.txt" || handle_error "Renaming output file"
+
+# Deduplication to remove duplicates, ensuring `www.` is not included
+awk '{sub(/^http:\/\/www\./, "http://", $0); print}' "final-${domain_name}-domains.txt" | \
+awk '!seen[$0]++' > "${domain_name}-domains.txt" || handle_error "Removing duplicates and renaming output file"
+# Delete the intermediate file
+rm -r "final-${domain_name}-domains.txt" || handle_error "Deleting intermediate file"
 sleep 3
+
 # Display the completion message in red
 echo -e "${BOLD_RED}Enumeration and filtering process completed successfully. Final output saved as ${domain_name}-domains.txt.${NC}"
-
 
 
 # Step 10.1: Deleting all unwanted files
@@ -1289,7 +1347,7 @@ sudo rm -r "brut-${domain_name}-domains.txt" "unique-${domain_name}-domains.txt"
 echo "Deleted the following files:"
 echo "- brut-${domain_name}-domains.txt"
 echo "- unique-${domain_name}-domains.txt"
-echo "- subs-subs.txt folder"
+echo "- subs-subs folder"
 sleep 3
 
 
@@ -1338,25 +1396,16 @@ run_step_4() {
     # Step 5: Crawling with Gau
 show_progress "Crawling links with Gau"
 
-# Detect the current user's home directory
-if [ "$EUID" -eq 0 ]; then
-    echo "Detected root user."
-    HOME_DIR="/root"
-else
-    echo "Detected non-root user."
-    USERNAME=$(whoami)
-    HOME_DIR="/home/$USERNAME"
-fi
-
-# Ensure the .gau.toml configuration file is removed
-rm -f "$HOME_DIR/.gau.toml"
+# Install Gau if not already installed
+go install github.com/lc/gau/v2/cmd/gau@latest
+export PATH=$PATH:$(go env GOPATH)/bin
 
 # Perform crawling with Gau and save results
 cat "${domain_name}-domains.txt" | gau | tee -a "${domain_name}-gau.txt" || handle_error "Gau crawl"
 
 sleep 3
 
-    echo -e "${BOLD_BLUE}Crawling and filtering URLs completed successfully. Output files created for each tool.${NC}"
+echo -e "${BOLD_BLUE}Crawling and filtering URLs completed successfully. Output files created for each tool.${NC}"
     
     # Step 6: Filter invalid links on Gospider and Hakrawler
     show_progress "Filtering invalid links on Gospider & Hakrawler & UrlFinder"
@@ -1518,7 +1567,7 @@ run_step_5() {
 
     # Step 24: Filtering ALIVE URLS
     show_progress "Filtering ALIVE URLS"
-    subprober -f "${domain_name}-links.txt" -sc -ar -o "${domain_name}-links.txt1337" -nc -mc 200 301 302 307 308 403 -c 20 || handle_error "subprober"
+    subprober -f "${domain_name}-links.txt" -sc -ar -o "${domain_name}-links.txt1337" -nc -mc 200 201 202 204 301 302 304 307 308 403 500 504 401 407 -c 20 || handle_error "subprober"
     sleep 5
 
     # Step 25: Removing old file
@@ -1547,10 +1596,25 @@ run_step_5() {
 run_step_6() {
     echo -e "${BOLD_WHITE}You selected: HiddenParamFinder for $domain_name${NC}"
 
-    # Step 1: Preparing URLs with clean extensions
-    show_progress "Preparing URLs with clean extensions, created 2 files: arjun-urls.txt and output-php-links.txt"
-    cat "${domain_name}-links.txt" | grep -E "\.php($|\s|\?|&|#|/|\.)|\.asp($|\s|\?|&|#|/|\.)|\.aspx($|\s|\?|&|#|/|\.)|\.cfm($|\s|\?|&|#|/|\.)|\.jsp($|\s|\?|&|#|/|\.)" | awk '{if ($0 !~ /\?/) print > "arjun-urls.txt"; else print > "output-php-links.txt";}'
-    sleep 3
+# Step 1: Preparing URLs with clean extensions
+show_progress "Preparing URLs with clean extensions, created 2 files: arjun-urls.txt and output-php-links.txt"
+
+# Extract all URLs with specific extensions into arjun-urls.txt and output-php-links.txt
+cat "${domain_name}-links.txt" | grep -E "\.php($|\s|\?|&|#|/|\.)|\.asp($|\s|\?|&|#|/|\.)|\.aspx($|\s|\?|&|#|/|\.)|\.cfm($|\s|\?|&|#|/|\.)|\.jsp($|\s|\?|&|#|/|\.)" | \
+awk '{print > "arjun-urls.txt"; print > "output-php-links.txt"}'
+sleep 3
+
+# Step 2: Clean parameters from URLs in arjun-urls.txt
+show_progress "Filtering and cleaning arjun-urls.txt to remove parameters and duplicates"
+
+# Clean parameters from URLs and save the cleaned version back to arjun-urls.txt
+awk -F'?' '{print $1}' arjun-urls.txt | awk '!seen[$0]++' > temp_arjun_urls.txt
+
+# Replace arjun-urls.txt with the cleaned file
+mv temp_arjun_urls.txt arjun-urls.txt
+
+show_progress "Completed cleaning arjun-urls.txt. All URLs are now clean, unique, and saved."
+
 
     # Check if Arjun generated any files
     if [ ! -s arjun-urls.txt ] && [ ! -s output-php-links.txt ]; then
@@ -1566,10 +1630,21 @@ run_step_6() {
     echo -e "${BOLD_BLUE}arjun-urls.txt and output-php-links.txt have been created.${NC}"
 
     # Step 2: Running Arjun on clean URLs if arjun-urls.txt is present
-    if [ -s arjun-urls.txt ]; then
-        show_progress "Running Arjun on clean URLs"
-        arjun -i arjun-urls.txt -oT arjun_output.txt -t 10 -w parametri.txt || handle_error "Arjun command"
-        sleep 5
+if [ -s arjun-urls.txt ]; then
+    show_progress "Running Arjun on clean URLs"
+    arjun -i arjun-urls.txt -oT arjun_output.txt -t 10 -w parametri.txt || handle_error "Arjun command"
+
+    # Merge files and process .php links
+if [ -f arjun-urls.txt ] || [ -f output-php-links.txt ] || [ -f arjun_output.txt ]; then
+    # Merge and extract only the base .php URLs, then remove duplicates
+    cat arjun-urls.txt output-php-links.txt arjun_output.txt 2>/dev/null | awk -F'?' '/\.php/ {print $1}' | sort -u > arjun-final.txt
+
+    echo -e "${BOLD_BLUE}arjun-final.txt created successfully with merged and deduplicated links.${NC}"
+else
+    echo -e "${YELLOW}No input files for merging. Skipping merge step.${NC}"
+fi
+
+sleep 5
 
         # Count the number of new links discovered by Arjun
         if [ -f arjun_output.txt ]; then
@@ -1589,7 +1664,6 @@ run_step_6() {
     show_progress "Cleaning up temporary files"
     if [[ -f arjun-urls.txt || -f arjun_output.txt || -f output-php-links.txt ]]; then
         [[ -f arjun-urls.txt ]] && rm -r arjun-urls.txt
-        [[ -f arjun_output.txt ]] && rm -r arjun_output.txt
         [[ -f output-php-links.txt ]] && rm -r output-php-links.txt
         sleep 3
     else
@@ -1601,17 +1675,12 @@ run_step_6() {
 # Step 5: Creating a new file for XSS testing
 if [ -f arjun-final.txt ]; then
     show_progress "Creating a new file for XSS testing"
-    cat "${domain_name}-links.txt" arjun-final.txt > urls-ready.txt || handle_error "Creating XSS testing file"
-    sleep 3
 
-    # Removing the previous links file
-    show_progress "Removing the previous links file"
-    rm -r "${domain_name}-links.txt" || handle_error "Removing previous links file"
+    # Ensure arjun-final.txt is added to urls-ready.txt
+    cat "${domain_name}-links.txt" arjun-final.txt > urls-ready1337.txt || handle_error "Creating XSS testing file"
+    rm -r "${domain_name}-links.txt"
+    mv urls-ready1337.txt "${domain_name}-links.txt"
     sleep 3
-
-    echo -e "${BOLD_RED}XSS testing file created successfully as urls-ready.txt.${NC}"
-else
-    echo -e "${RED}Skipping XSS testing file creation due to missing Arjun output.${NC}"
     mv "${domain_name}-links.txt" urls-ready.txt || handle_error "Renaming ${domain_name}-links.txt"
 fi
 
@@ -1662,10 +1731,124 @@ sleep 3
     echo -e "${BOLD_BLUE}Cleaned up and renamed output to ${domain_name}-query.txt.${NC}"
     sleep 3
 
-    # Step 3: Checking page reflection on the URLs
+# Step 4: Cleanup and rename the output file
+show_progress "Cleaning up intermediate files and setting final output"
+
+# Filter the file ${domain_name}-query.txt using the specified awk command
+show_progress "Filtering ${domain_name}-query.txt for unique and normalized URLs"
+awk '{ gsub(/^https:/, "http:"); gsub(/^http:\/\/www\./, "http://"); if (!seen[$0]++) print }' "${domain_name}-query.txt" | tr -d '\r' > "${domain_name}-query1.txt"
+
+# Remove the old query file
+rm -r "${domain_name}-query.txt"
+
+# Rename the filtered file to the original name
+mv "${domain_name}-query1.txt" "${domain_name}-query.txt"
+
+# Count the number of URLs in the renamed file
+url_count=$(wc -l < "${domain_name}-query.txt")
+
+## Final message with progress count
+echo -e "${BOLD_BLUE}Cleaned up and renamed output to ${domain_name}-query.txt.${NC}"
+echo -e "${BOLD_BLUE}Total URLs to be tested for Page Reflection: ${url_count}${NC}"
+sleep 3
+
+# Add links from arjun_output.txt into ${domain_name}-query.txt
+if [ -f "arjun_output.txt" ]; then
+    echo -e "${BOLD_WHITE}Adding links from arjun_output.txt into ${domain_name}-query.txt.${NC}"
+    cat arjun_output.txt >> "${domain_name}-query.txt"
+    echo -e "${BOLD_BLUE}Links from arjun_output.txt added to ${domain_name}-query.txt.${NC}"
+else
+    echo -e "${YELLOW}No Arjun output links to add. Proceeding without additional links.${NC}"
+fi
+
+# Extract unique subdomains and append search queries
+echo -e "${BOLD_WHITE}Processing unique subdomains to append search queries...${NC}"
+
+# Define the list of search queries to append
+search_queries=(
+    "search?q=aaa"
+    "?query=aaa"
+    "en-us/Search#/?search=aaa"
+    "Search/Results?q=aaa"
+    "q=aaa"
+    "foo?q=aaa"
+    "search.php?query=aaa"
+    "en-us/search?q=aaa"
+    "s=aaa"
+    "find?q=aaa"
+    "result?q=aaa"
+    "query?q=aaa"
+    "search?term=aaa"
+    "search?query=aaa"
+    "search?keywords=aaa"
+    "search?text=aaa"
+    "search?word=aaa"
+    "find?query=aaa"
+    "result?query=aaa"
+    "search?input=aaa"
+    "search/results?query=aaa"
+    "search-results?q=aaa"
+    "search?keyword=aaa"
+    "results?query=aaa"
+    "search?search=aaa"
+    "search?searchTerm=aaa"
+    "search?searchQuery=aaa"
+    "search?searchKeyword=aaa"
+    "search.php?q=aaa"
+    "search/?query=aaa"
+    "search/?q=aaa"
+    "search/?search=aaa"
+    "search.aspx?q=aaa"
+    "search.aspx?query=aaa"
+    "search.asp?q=aaa"
+    "index.asp?id=aaa"
+    "dashboard.asp?user=aaa"
+    "blog/search/?query=aaa"
+    "pages/searchpage.aspx?id=aaa"
+)
+
+# Extract unique subdomains (normalize to remove protocol and www)
+normalized_subdomains=$(awk -F/ '{print $1 "//" $3}' "${domain_name}-query.txt" | sed -E 's~(https?://)?(www\.)?~~' | sort -u)
+
+# Create a mapping of preferred protocols for unique subdomains
+declare -A preferred_protocols
+while read -r url; do
+    # Extract protocol, normalize subdomain
+    protocol=$(echo "$url" | grep -oE '^https?://')
+    subdomain=$(echo "$url" | sed -E 's~(https?://)?(www\.)?~~' | awk -F/ '{print $1}')
+
+    # Set protocol preference: prioritize http over https
+    if [[ "$protocol" == "http://" ]]; then
+        preferred_protocols["$subdomain"]="http://"
+    elif [[ -z "${preferred_protocols["$subdomain"]}" ]]; then
+        preferred_protocols["$subdomain"]="https://"
+    fi
+done < "${domain_name}-query.txt"
+
+# Create a new file for the appended URLs
+append_file="${domain_name}-query-append.txt"
+> "$append_file"
+
+# Append each search query to the preferred subdomains
+for subdomain in $normalized_subdomains; do
+    protocol="${preferred_protocols[$subdomain]}"
+    for query in "${search_queries[@]}"; do
+        echo "${protocol}${subdomain}/${query}" >> "$append_file"
+    done
+done
+
+# Combine the original file with the appended file
+cat "${domain_name}-query.txt" "$append_file" > "${domain_name}-query-final.txt"
+
+# Replace the original file with the combined result
+mv "${domain_name}-query-final.txt" "${domain_name}-query.txt"
+
+echo -e "${BOLD_BLUE}Appended URLs saved and combined into ${domain_name}-query.txt.${NC}"
+
+# Step 3: Checking page reflection on the URLs
 if [ -f "reflection.py" ]; then
     echo -e "${BOLD_WHITE}Checking page reflection on the URLs with command: python3 reflection.py ${domain_name}-query.txt --threads 2${NC}"
-    sudo  python3 reflection.py "${domain_name}-query.txt" --threads 2 || handle_error "reflection.py execution"
+    sudo python3 reflection.py "${domain_name}-query.txt" --threads 2 || handle_error "reflection.py execution"
     sleep 5
 
     # Check if xss.txt is created after reflection.py
@@ -1689,7 +1872,7 @@ if [ -f "reflection.py" ]; then
 
             # Remove the original xss.txt file
             echo -e "${BOLD_BLUE}Removing the old xss.txt file...${NC}"
-            sudo rm -r xss.txt
+            sudo rm -r xss.txt arjun_output.txt arjun-final.txt "${domain_name}-query-append.txt"
             sleep 3
 
             # Removing 99% similar parameters with bash command
@@ -1716,7 +1899,7 @@ if [ -f "reflection.py" ]; then
             echo -e "${BOLD_WHITE}Filtered Final URLs for XSS Testing: ${RED}${total_urls}${NC}"
 
             # Automatically run the xss0r command after reflection step
-            ./xss0r --get --urls xss-urls.txt --payloads payloads.txt --shuffle --threads 9 || handle_error "Launching xss0r Tool"
+            ./xss0r --get --urls xss-urls.txt --payloads payloads.txt --shuffle --threads 10 --path || handle_error "Launching xss0r Tool"
         fi
     else
         echo -e "${RED}xss.txt not found. No reflective URLs identified.${NC}"
@@ -1735,7 +1918,7 @@ run_step_8() {
     # Check if xss0r and xss-urls.txt files exist
     if [ -f "xss0r" ] && [ -f "xss-urls.txt" ]; then
         show_progress "Running xss0r for XSS vulnerabilities"
-        ./xss0r --get --urls xss-urls.txt --payloads payloads.txt --shuffle --threads 9
+        ./xss0r --get --urls xss-urls.txt --payloads payloads.txt --shuffle --threads 10 --path
         if [[ $? -ne 0 ]]; then  # Check if xss0r command failed
             echo -e "${RED}The xss0r Tool encountered an error during execution.${NC}"
             exit 1
@@ -1851,7 +2034,7 @@ run_path_based_xss() {
 
     # Step 6: Deleting all previous files except the last one (path6.txt)
     show_progress "Deleting all intermediate files..."
-    rm -f path1.txt path1-filtered.txt path3.txt path4.txt path5.txt
+    rm -f path1.txt path1-filtered.txt path3.txt path4.txt path5.txt ${domain_name}-unique-links.txt
 
     # Step 7: Renaming path6.txt to path-ready.txt
     show_progress "Renaming path6.txt to path-ready.txt..."
@@ -1890,7 +2073,7 @@ run_path_based_xss() {
 
     # Step 12: Launch the xss0r tool for path-based XSS testing
     echo -e "${BOLD_BLUE}Launching the xss0r tool on path-xss-urls.txt...${NC}"
-    ./xss0r --get --urls path-xss-urls.txt --payloads payloads.txt --shuffle --threads 9 --path
+    ./xss0r --get --urls path-xss-urls.txt --payloads payloads.txt --shuffle --threads 10 --path
     if [[ $? -ne 0 ]]; then
         echo -e "${RED}The xss0r tool encountered an error during execution.${NC}"
         exit 1
