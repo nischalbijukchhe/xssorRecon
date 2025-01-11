@@ -189,10 +189,28 @@ install_tools() {
     sudo apt update
     sudo apt update --fix-missing
     sudo apt install pip
+    sudo pip3 uninstall -y subprober
+    sudo pip uninstall subprober --break-system-packages
+    sudo apt install -y python3.12
+    sudo apt install -y build-essential libssl-dev zlib1g-dev libncurses5-dev libnss3-dev libsqlite3-dev libreadline-dev libffi-dev curl libbz2-dev
+    rm -r /usr/local/bin/subprober
+    rm -r ~/.local/bin/subprober 
+    rm -r /root/.local/bin/subprober
+    sudo pip install "subprober<2.0"
+    sudo apt install python3.12-venv
+    source .venv/bin/activate
+    python3 -m venv .venv
     sudo pip install colorama --break-system-packages
     pip install aiodns --break-system-packages
     pip install aiofiles --break-system-packages
+    pip install -U bs4 --break-system-packages
+    pip install -U lxml --break-system-packages
+    sudo pip install aiojarm --break-system-packages
+    sudo pip install playwright --break-system-packages
+    sudo pip install subprober --break-system-packages --no-deps anyio==4.6.2
     sudo pip install uvloop --break-system-packages
+    sudo pip install -U bs4 --break-system-packages
+    sudo pip install -U lxml --break-system-packages
     sudo apt --fix-broken install
     sudo apt install -y python3 python3-pip python3-venv python3-setuptools git wget curl
     sudo apt-mark hold google-chrome-stable
@@ -207,12 +225,9 @@ install_tools() {
     # Step 1: Install Python3 virtual environment and structlog in venv
     show_progress "Installing python3-venv and setting up virtual environment"
 
-    # Create virtual environment
-    python3 -m venv env
-
-    # Upgrade pip in virtual environment
+    # Upgrade pip 
     sudo pip install --upgrade pip 
-    pip install tldextract --break-system-packages
+    sudo pip install tldextract --break-system-packages
     sudo pip install structlog requests uvloop setuptools pipx
 
     # Install necessary Python packages within the virtual environment
@@ -221,11 +236,21 @@ install_tools() {
     # Install pipx within the virtual environment
     sudo pip install pipx
     sudo pip install asynciolimiter
+    sudo pip install aiojarm
+    sudo pip install playwright
+    
 
     # Install Dnsbruter, Subdominator, SubProber within the virtual environment
     sudo pip install git+https://github.com/RevoltSecurities/Dnsbruter
-    sudo pip install git+https://github.com/RevoltSecurities/Subdominator.git
-    sudo pip install git+https://github.com/RevoltSecurities/Subprober.git
+    sudo pip install git+https://github.com/RevoltSecurities/Subdominator --break-system-packages
+    sudo pip install git+https://github.com/RevoltSecurities/Subdominator --no-deps httpx==0.25.2
+    pipx install git+https://github.com/RevoltSecurities/Subdominator
+    sudo pip install git+https://github.com/RevoltSecurities/Subprober --break-system-packages
+    sudo pip install git+https://github.com/RevoltSecurities/Subprober --break-system-packages
+    sudo pip install subprober --break-system-packages --no-deps anyio==4.6.2
+    sudo pip install git+https://github.com/RevoltSecurities/Subprober.git --no-deps aiojarm
+    sudo pip install git+https://github.com/RevoltSecurities/Subprober.git --no-deps playwright
+    pipx install git+https://github.com/RevoltSecurities/Subprober --break-system-packages
 
     # Install Uro, Arjun, and other required Python packages
     sudo pip install uro
@@ -396,13 +421,16 @@ sleep 3
     sudo pip install --upgrade pipx
     sudo apt install pipx -y
     pipx ensurepath
+    subprober -up
+    cp /root/.local/bin/subprober /usr/local/bin
 
     # Step 4: Install Dnsbruter (Skip if already installed)
 if ! command -v dnsbruter &> /dev/null; then
     show_progress "Installing Dnsbruter"
 
     # Try installing directly with pip
-    sudo pip install --no-deps --force-reinstall --break-system-packages git+https://github.com/RevoltSecurities/Dnsbruter.git
+    sudo pip install --no-deps --force-reinstall --break-system-packages git+https://github.com/RevoltSecurities/Dnsbruter
+    pipx install git+https://github.com/RevoltSecurities/Dnsbruter.git
 
     # Check if the installation was successful
     if ! pip show dnsbruter &> /dev/null; then
@@ -432,6 +460,8 @@ if ! command -v dnsbruter &> /dev/null; then
 
     show_progress "Dnsbruter installation complete."
     sleep 3
+    sudo pip3 install dnsbruter "aiodns>=3.2.0" "aiofiles>=24.1.0" "alive_progress>=3.2.0" "art>=6.1" "asynciolimiter>=1.1.0.post3" "colorama>=0.4.4" "requests>=2.32.3" "setuptools>=75.2.0" "uvloop>=0.21.0"
+
 else
     show_progress "Dnsbruter is already installed. Skipping installation."
 fi
@@ -441,7 +471,8 @@ if [ ! -d "Subdominator" ]; then
     show_progress "Installing Subdominator"
 
     # Try installing directly with pip
-    sudo pip install git+https://github.com/RevoltSecurities/Subdominator.git --break-system-packages --root-user-action=ignore
+    sudo pip install git+https://github.com/RevoltSecurities/Subdominator --break-system-packages --root-user-action=ignore
+    sudo pip install git+https://github.com/RevoltSecurities/Subdominator --no-deps httpx==0.25.2
 
     # Check if the installation was successful
     if ! pip show subdominator &> /dev/null; then
@@ -457,6 +488,8 @@ if [ ! -d "Subdominator" ]; then
         # Clean up by removing the cloned directory after installation
         cd ..
         sudo rm -rf Subdominator
+        sudo pipx inject subdominator "aiofiles>=23.2.1" "aiohttp>=3.9.4" "appdirs>=1.4.4" "httpx>=0.27.2" "art>=6.1" "beautifulsoup4>=4.11.1" "colorama>=0.4.6" "fake_useragent>=1.5.0" "PyYAML>=6.0.1" "requests>=2.31.0" "rich>=13.7.1" "urllib3>=1.26.18" "tldextract>=5.1.2"
+
     else
         echo "Subdominator installed successfully using pip."
     fi
@@ -472,7 +505,8 @@ if [ ! -d "SubProber" ]; then
     show_progress "Installing SubProber"
 
     # Try installing directly with pip
-    sudo pip install git+https://github.com/RevoltSecurities/Subprober.git --break-system-packages --root-user-action=ignore
+    sudo pip install git+https://github.com/RevoltSecurities/Subprober --break-system-packages --root-user-action=ignore
+    pipx install git+https://github.com/RevoltSecurities/Subprober.git
 
     # Check if the installation was successful
     if ! pip show subprober &> /dev/null; then
@@ -488,11 +522,14 @@ if [ ! -d "SubProber" ]; then
         # Clean up by removing the cloned directory after installation
         cd ..
         sudo rm -rf Subprober
+        cp /root/.local/bin/subprober /usr/local/bin
     else
         echo "SubProber installed successfully using pip."
     fi
 
     show_progress "SubProber installation complete."
+    sudo pip3 install --break-system-packages "subprober" "aiodns>=3.2.0" "aiofiles>=24.1.0" "aiojarm>=0.2.2" "alive_progress>=3.2.0" "appdirs>=1.4.4" "art>=6.4" "asynciolimiter>=1.1.1" "beautifulsoup4>=4.12.3" "colorama>=0.4.6" "cryptography>=44.0.0" "fake_useragent>=1.5.1" "httpx>=0.28.1" "mmh3>=5.0.1" "playwright>=1.49.1" "requests>=2.32.3" "rich>=13.9.4" "setuptools>=75.2.0" "simhash>=2.1.2" "urllib3>=1.26.18" "uvloop>=0.21.0" "websockets>=14.1" "bs4>=0.0.2" "lxml>=5.3.0"
+    for t in dnsbruter subdominator subprober; do [ -f "$HOME/.local/bin/$t" ] && [ "$HOME/.local/bin/$t" != "/usr/local/bin/$t" ] && sudo cp "$HOME/.local/bin/$t" /usr/local/bin/; done
     sleep 3
 else
     show_progress "SubProber is already installed. Skipping installation."
@@ -914,6 +951,9 @@ uro -h > /dev/null 2>&1 && echo "Uro is installed" || echo "Uro is not installed
 
 echo -e "${BOLD_WHITE}10. Arjun:${NC}"
 arjun -h > /dev/null 2>&1 && echo "Arjun is installed" || echo "Arjun is not installed correctly"
+
+echo -e "${BOLD_WHITE}11. URLFinder:${NC}"
+urlfinder -h > /dev/null 2>&1 && echo "URLFinder is installed" || echo "URLFinder is not installed correctly"
 
 echo -e "${BOLD_WHITE}11. Tmux:${NC}"
 echo "Tmux is installed (skipping check)"
@@ -1567,7 +1607,7 @@ run_step_5() {
 
     # Step 24: Filtering ALIVE URLS
     show_progress "Filtering ALIVE URLS"
-    subprober -f "${domain_name}-links.txt" -sc -ar -o "${domain_name}-links.txt1337" -nc -mc 200 201 202 204 301 302 304 307 308 403 500 504 401 407 -c 20 || handle_error "subprober"
+    subprober -f "${domain_name}-links.txt" -sc -ar -o "${domain_name}-links.txt1337" -nc -mc 200,201,202,204,301,302,304,307,308,403,500,504,401,407 -c 20 || handle_error "subprober"
     sleep 5
 
     # Step 25: Removing old file
