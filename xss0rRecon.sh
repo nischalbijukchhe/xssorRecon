@@ -206,6 +206,7 @@ install_tools() {
     source  .venv/bin/activate 
     python3 -m venv .venv
     sudo apt install -y python3-pip
+    sudo apt upgrade python3
     sudo apt install pip
     sudo apt install pip3
     pip3 install requests urllib3
@@ -1916,7 +1917,6 @@ search_queries=(
     "en-us/Search#/?search=aaa"
     "Search/Results?q=aaa"
     "q=aaa"
-    "foo?q=aaa"
     "search.php?query=aaa"
     "en-us/search?q=aaa"
     "s=aaa"
@@ -1950,6 +1950,44 @@ search_queries=(
     "dashboard.asp?user=aaa"
     "blog/search/?query=aaa"
     "pages/searchpage.aspx?id=aaa"
+    "search.action?q=aaa"
+    "search.json?q=aaa"
+    "search/index?q=aaa"
+    "lookup?q=aaa"
+    "browse?q=aaa"
+    "search-products?q=aaa"
+    "products/search?q=aaa"
+    "news?q=aaa"
+    "articles?q=aaa"
+    "content?q=aaa"
+    "explore?q=aaa"
+    "search/advanced?q=aaa"
+    "search-fulltext?q=aaa"
+    "products?query=aaa"
+    "search?product=aaa"
+    "catalog/search?q=aaa"
+    "store/search?q=aaa"
+    "shop?q=aaa"
+    "items?query=aaa"
+    "search?q=aaa&category=aaa"
+    "store/search?term=aaa"
+    "marketplace?q=aaa"
+    "blog/search?q=aaa"
+    "news?query=aaa"
+    "articles?search=aaa"
+    "topics?q=aaa"
+    "stories?q=aaa"
+    "newsfeed?q="
+    "search-posts?q=aaa"
+    "blog/posts?q=aaa"
+    "search/article?q=aaa"
+    "api/search?q=aaa"
+    "en/search/explore?q=aaa"
+    "bs-latn-ba/Search/Results?q=aaa"
+    "en-us/marketplace/apps?search=aaa"
+    "search/node?keys=aaaa"
+    "v1/search?q=aaa"
+    "api/v1/search?q=aaa"
 )
 
 # Extract unique subdomains (normalize to remove protocol and www)
