@@ -56,11 +56,12 @@ clear
 
 # Display banner
 echo -e "${BOLD_BLUE}"
-echo "               ___         ____                              ____  "
-echo "__  _____ ___ / _ \ _ __  |  _ \ ___  ___ ___  _ __   __   _|___ \ V2"
-echo "\ \/ / __/ __| | | | '__| | |_) / _ \/ __/ _ \| '_ \  \ \ / / __) |"
-echo " >  <\__ \__ \ |_| | |    |  _ <  __/ (_| (_) | | | |  \ V / / __/ "
-echo "/_/\_\___/___/\___/|_|    |_| \_\___|\___\___/|_| |_|   \_/ |_____|"
+echo "               ___         ____                              _____ "
+echo "__  _____ ___ / _ \ _ __  |  _ \ ___  ___ ___  _ __   __   _|___ / "
+echo "\ \/ / __/ __| | | | '__| | |_) / _ \/ __/ _ \| '_ \  \ \ / / |_ \ "
+echo " >  <\__ \__ \ |_| | |    |  _ <  __/ (_| (_) | | | |  \ V / ___) |"
+echo "/_/\_\___/___/\___/|_|    |_| \_\___|\___\___/|_| |_|   \_/ |____/ "
+echo "                           xss0r Recon v3"
 echo -e "${NC}"
 
 # Centered Contact Information
@@ -82,7 +83,9 @@ display_options() {
     echo -e "${YELLOW}9: Exit${NC}"
     echo -e "${YELLOW}10: Guide to Deploying xss0r on VPS Servers${NC}"
     echo -e "${YELLOW}11: Path-based XSS${NC}"
+    echo -e "${YELLOW}12: Domains Search Inputs${NC}"
 }
+
 
 # Function to display Guide to Deploying xss0r on VPS Servers information with better formatting and crystal-like color
 show_vps_info() {
@@ -199,12 +202,43 @@ install_tools() {
     echo -e "${BOLD_WHITE}You selected: Install all tools${NC}"
 
     show_progress "Installing dependencies"
-    sudo apt update && sudo apt upgrade -y
-    sudo apt update --fix-missing
+    sudo apt-mark hold google-chrome-stable
+    sudo apt install git
+    sudo apt update && sudo apt install needrestart -y && sudo apt upgrade -y -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confdef" && sudo apt dist-upgrade -y -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confdef" && sudo dpkg --configure -a && sudo apt -f install -y && sudo needrestart -q -n    sudo apt update --fix-missing
+    # Check if the OS is Ubuntu
+if grep -qi "ubuntu" /etc/*release; then
+    echo "Ubuntu detected! Running installation commands..."
+    
+    # Update and upgrade packages
+    apt update && apt upgrade -y
+
+    # Install required dependencies
+    apt install software-properties-common -y
+
+    # Add the deadsnakes PPA
+    add-apt-repository ppa:deadsnakes/ppa -y
+
+    # Update package list again
+    apt update
+
+    # Install Python 3.12
+    apt install python3.12 -y
+
+    # Verify installation
+    sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
+    sudo update-alternatives --config python3
+    sudo ln -sf /usr/bin/python3 /usr/bin/python
+    sudo apt install --reinstall python3-apt
+    sudo apt install python3-distutils
+    curl -sS https://bootstrap.pypa.io/get-pip.py | python3
+    sudo apt install --reinstall python3-pip
+    python3.12 --version
+else
+    echo "This is not an Ubuntu system. Skipping installation."
+fi
     sudo apt install python3.12-venv
     python3 -m venv .venv
-    source  .venv/bin/activate 
-    python3 -m venv .venv
+    source .venv/bin/activate 
     sudo apt install -y python3-pip
     sudo apt upgrade python3
     sudo apt install pip
@@ -214,11 +248,13 @@ install_tools() {
     sudo apt install -y python3.12
     sudo apt install -y build-essential libssl-dev zlib1g-dev libncurses5-dev libnss3-dev libsqlite3-dev libreadline-dev libffi-dev curl libbz2-dev make
     sudo apt install -y pkg-config
+    sudo apt install -y libssl-dev libffi-dev
     sudo pip install colorama --break-system-packages
-    pip install aiodns --break-system-packages
-    pip install aiofiles --break-system-packages
-    pip install -U bs4 --break-system-packages
-    pip install -U lxml --break-system-packages
+    sudo pip install aiodns --break-system-packages
+    sudo pip install aiofiles --break-system-packages
+    sudo pip install -U bs4 --break-system-packages
+    sudo pip install -U lxml --break-system-packages
+    sudo pip install --upgrade cython
     sudo pip install aiojarm --break-system-packages
     sudo pip install playwright --break-system-packages
     sudo pip install subprober --break-system-packages --no-deps anyio==4.6.2
@@ -227,7 +263,6 @@ install_tools() {
     sudo pip install -U lxml --break-system-packages
     sudo apt --fix-broken install
     sudo apt install -y python3 python3-pip python3-venv python3-setuptools git wget curl
-    sudo apt-mark hold google-chrome-stable
     sudo apt-get install -y rsync zip unzip p7zip-full golang-go terminator pipx tmux
 
     # Remove conflicting package if it exists
@@ -312,103 +347,83 @@ install_tools() {
    # Step 3: Install Go
 show_progress "Installing Go 1.22.5"
 
-# Remove any existing Go installations
+# Step 1: Remove any existing Go installations
 echo "Removing existing Go installations and cache..."
 sudo apt remove --purge golang -y
 sudo apt autoremove --purge -y
 sudo apt clean
-sudo rm -rf /usr/local/go
-sudo rm -rf /usr/bin/go
-sudo rm -rf /usr/local/bin/go
-sudo rm -rf /usr/local/sbin/go
-sudo rm -rf ~/go
-sudo rm -rf ~/.go
-sudo rm -rf ~/go-workspace
-sudo rm -rf ~/.gvm
-sudo rm -rf /root/go
-sudo rm -rf ~/go/pkg
-sudo rm -rf ~/go/bin
-sudo rm -rf ~/go/src
-sudo rm -rf ~/.cache/go-build
-sudo rm -rf ~/.config/go
-sudo rm -rf ~/.config/gopls
-sudo rm -rf /root/.cache/go-build
-sudo rm -rf /root/.config/go
+sudo rm -rf /usr/local/go /usr/bin/go /usr/local/bin/go /root/go ~/go ~/.cache/go-build ~/.config/go ~/.config/gopls
 
 # Remove Go from PATH if previously added
-export PATH=$(echo "$PATH" | sed -e 's|:/usr/local/go/bin||' -e 's|:$HOME/go/bin||' -e 's|:$HOME/.local/bin||')
+export PATH=$(echo "$PATH" | sed -e 's|:/usr/local/go/bin||' -e 's|:$HOME/go/bin||')
 
 # Confirm removal
 echo "Existing Go installations removed."
 
-# Download the required Go version
+# Step 2: Download and Install Go
 echo "Downloading Go 1.22.5..."
+sudo apt install golang -y
 wget https://go.dev/dl/go1.22.5.linux-amd64.tar.gz
 
-# Extract the Go tarball and install
 echo "Installing Go 1.22.5..."
 sudo tar -C /usr/local -xzf go1.22.5.linux-amd64.tar.gz
-
-# Set up the environment variables
-export PATH=$PATH:/usr/local/go/bin
-export PATH=$PATH:$HOME/go/bin
-export PATH=$PATH:$HOME/go/bin:$HOME/.local/bin
-export GOPATH=$HOME/go
-export PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
-
-# Verify the installed version
-go version
 
 # Clean up the downloaded tarball
 sudo rm -r go1.22.5.linux-amd64.tar.gz
 
-# Install dependencies for gvm
-echo "Installing dependencies for gvm..."
-sudo apt install -y curl git mercurial make binutils bison gcc build-essential
+# Step 3: Set up environment variables
+echo "Configuring Go environment..."
+echo 'export PATH=$PATH:/usr/local/go/bin' | sudo tee -a /etc/profile.d/go.sh
+echo 'export GOPATH=$HOME/go' | sudo tee -a /etc/profile.d/go.sh
+echo 'export PATH=$PATH:$GOPATH/bin' | sudo tee -a /etc/profile.d/go.sh
 
-# Install gvm and set Go 1.22.5 as default
-echo "Installing gvm and setting up Go 1.22.5 as default..."
-bash < <(curl -sSL https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
-source ~/.gvm/scripts/gvm
-gvm install go1.22.5
-gvm use go1.22.5 --default
+# Apply environment changes immediately
+source /etc/profile.d/go.sh
 
-# Clean Go build cache
-go clean
+# Make Go available globally for all users
+sudo ln -sf /usr/local/go/bin/go /usr/bin/go
+sudo ln -sf /usr/local/go/bin/gofmt /usr/bin/gofmt
 
-# Hold updates for the Go package
-echo "Holding updates for Go installation..."
-sudo apt-mark hold golang-go
-
-# Sleep to allow environment variable changes to propagate
-sleep 3
-
-# Dynamically set the PATH based on the current user
-if [ "$EUID" -eq 0 ]; then
-    echo "You are the root user."
-    export PATH="$PATH:/root/.local/bin"
+# Step 4: Verify the installation
+echo "Verifying Go installation..."
+if go version; then
+    echo -e "Go 1.22.5 has been successfully installed and configured."
 else
-    # Detect the username of the home user
-    USERNAME=$(whoami)
-    echo "You are the home user: $USERNAME"
-    export PATH="$PATH:/home/$USERNAME/.local/bin"
+    echo -e "Failed to install Go. Please check for errors and retry."
+    exit 1
 fi
 
-# Print the updated PATH for confirmation
-echo "Updated PATH: $PATH"
+# Step 5: Install dependencies for GVM (optional, for managing multiple Go versions)
+echo "Installing dependencies for GVM..."
+sudo apt install -y curl git mercurial make binutils bison gcc build-essential
 
-# Confirm successful installation
-echo -e "${BOLD_BLUE}Go 1.22.5 has been successfully installed, configured, and set as default using gvm.${NC}"
+# Step 6: (Optional) Install and Configure GVM for Version Management
+echo "Installing GVM..."
+if [ ! -d "$HOME/.gvm" ]; then
+    bash < <(curl -sSL https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
+    source ~/.gvm/scripts/gvm
+    gvm install go1.22.5
+    gvm use go1.22.5 --default
+else
+    echo "GVM is already installed."
+fi
 
-# Sleep to allow changes to take effect
-sleep 3
+# Final Step: Clean Go cache
+go clean
+echo "Go installation complete!"
 
-# Add Go bin to PATH
-export PATH=$PATH:$(go env GOPATH)/bin
-
-# Print the updated PATH for confirmation
-echo "Updated PATH: $PATH"
-
+# Check if Go is installed and its version
+echo "Checking Go version..."
+if command -v go &> /dev/null; then
+    GO_VERSION=$(go version)
+    if [[ $GO_VERSION == go\ version\ go* ]]; then
+        echo "Go is installed: $GO_VERSION"
+    else
+        echo "Go command exists, but the version could not be determined."
+    fi
+else
+    echo "Go is not installed on this system."
+fi
 # Confirm successful installation
 echo -e "${BOLD_BLUE}Go has been successfully installed and configured.${NC}"
 
@@ -443,10 +458,18 @@ if ! command -v dnsbruter &> /dev/null; then
     show_progress "Installing Dnsbruter"
 
     # Try installing directly with pip
+    python3 -m venv .venv
+    source .venv/bin/activate 
     sudo pip install --no-deps --force-reinstall --break-system-packages git+https://github.com/RevoltSecurities/Dnsbruter
     pipx install git+https://github.com/RevoltSecurities/Dnsbruter.git
 
+
     # Check if the installation was successful
+        python3 -m venv .venv
+        source .venv/bin/activate
+        python3 -m pip install --upgrade dnsbruter
+        python3 -m pip install --break-system-packages --upgrade dnsbruter
+        dnsbruter -up
     if ! pip show dnsbruter &> /dev/null; then
         echo "Direct installation failed. Attempting installation via cloning the repository."
 
@@ -456,6 +479,10 @@ if ! command -v dnsbruter &> /dev/null; then
 
         # Install from the local cloned repository
         sudo pip install . --break-system-packages --root-user-action=ignore
+        python3 -m venv .venv
+        source .venv/bin/activate
+        python3 -m pip install --upgrade dnsbruter
+        python3 -m pip install --break-system-packages --upgrade dnsbruter
         dnsbruter -up
 
         # Clean up by removing the cloned directory after installation
@@ -475,6 +502,8 @@ if ! command -v dnsbruter &> /dev/null; then
 
     show_progress "Dnsbruter installation complete."
     sleep 3
+    python3 -m venv .venv
+    source .venv/bin/activate
     sudo pip3 install dnsbruter "aiodns>=3.2.0" "aiofiles>=24.1.0" "alive_progress>=3.2.0" "art>=6.1" "asynciolimiter>=1.1.0.post3" "colorama>=0.4.4" "requests>=2.32.3" "setuptools>=75.2.0" "uvloop>=0.21.0"
 
 else
@@ -486,6 +515,10 @@ if [ ! -d "Subdominator" ]; then
     show_progress "Installing Subdominator"
 
     # Try installing directly with pip
+    python3 -m venv .venv
+    source .venv/bin/activate
+    sudo pip uninstall uvloop -y && sudo pip3 uninstall uvloop -y && sudo pipx uninstall uvloop || true && sudo pip install uvloop --break-system-packages
+    sudo pip install --upgrade aiodns pycares --break-system-packages
     sudo pip install git+https://github.com/RevoltSecurities/Subdominator --break-system-packages --root-user-action=ignore
     sudo pip install git+https://github.com/RevoltSecurities/Subdominator --no-deps httpx==0.25.2
 
@@ -504,6 +537,8 @@ if [ ! -d "Subdominator" ]; then
         # Clean up by removing the cloned directory after installation
         cd ..
         sudo rm -rf Subdominator
+        python3 -m venv .venv
+        source .venv/bin/activate
         sudo pipx inject subdominator "aiofiles>=23.2.1" "aiohttp>=3.9.4" "appdirs>=1.4.4" "httpx>=0.27.2" "art>=6.1" "beautifulsoup4>=4.11.1" "colorama>=0.4.6" "fake_useragent>=1.5.0" "PyYAML>=6.0.1" "requests>=2.31.0" "rich>=13.7.1" "urllib3>=1.26.18" "tldextract>=5.1.2"
 
     else
@@ -521,6 +556,8 @@ if [ ! -d "SubProber" ]; then
     show_progress "Installing SubProber"
 
     # Try installing directly with pip
+    python3 -m venv .venv
+    source .venv/bin/activate 
     sudo pip install git+https://github.com/RevoltSecurities/Subprober --break-system-packages --root-user-action=ignore
     pipx install git+https://github.com/RevoltSecurities/Subprober.git
 
@@ -534,6 +571,7 @@ if [ ! -d "SubProber" ]; then
 
         # Install from local cloned repository
         sudo pip install . --break-system-packages --root-user-action=ignore
+        pip install subprober aiojarm
         subprober -up
 
         # Clean up by removing the cloned directory after installation
@@ -545,21 +583,22 @@ if [ ! -d "SubProber" ]; then
     fi
 
     show_progress "SubProber installation complete."
+    python3 -m venv .venv
+    source .venv/bin/activate
     sudo pip3 install --break-system-packages "subprober" "aiodns>=3.2.0" "aiofiles>=24.1.0" "aiojarm>=0.2.2" "alive_progress>=3.2.0" "appdirs>=1.4.4" "art>=6.4" "asynciolimiter>=1.1.1" "beautifulsoup4>=4.12.3" "colorama>=0.4.6" "cryptography>=44.0.0" "fake_useragent>=1.5.1" "httpx>=0.28.1" "mmh3>=5.0.1" "playwright>=1.49.1" "requests>=2.32.3" "rich>=13.9.4" "setuptools>=75.2.0" "simhash>=2.1.2" "urllib3>=1.26.18" "uvloop>=0.21.0" "websockets>=14.1" "bs4>=0.0.2" "lxml>=5.3.0"
-    for t in dnsbruter subdominator subprober; do [ -f "$HOME/.local/bin/$t" ] && [ "$HOME/.local/bin/$t" != "/usr/local/bin/$t" ] && sudo cp "$HOME/.local/bin/$t" /usr/local/bin/; done
+    for t in dnsbruter subdominator subprober; do [ -f "$HOME/.local/bin/$t" ] && [ "$HOME/.local/bin/$t" != "/usr/local/bin/$t" ] && sudo cp "$HOME/.local/bin/$t" /usr/local/bin/; done 
+    pwd && ORIGIN="$(pwd)" && cd "$ORIGIN/.venv/bin" && sudo cp * /usr/local/bin && cd "$ORIGIN"
+    pip install subprober
     sleep 3
 else
     show_progress "SubProber is already installed. Skipping installation."
 fi
 
     # Step 7: Install GoSpider
+python3 -m venv .venv
+source .venv/bin/activate 
 show_progress "Installing GoSpider"
 
-# Ensure Go is installed
-if ! command -v go &> /dev/null; then
-    echo -e "${RED}Go is not installed. Please install Go before proceeding.${NC}"
-    exit 1
-fi
 
 # Attempt to install GoSpider using 'go install'
 echo -e "${BOLD_WHITE}Attempting to install GoSpider using 'go install'...${NC}"
@@ -604,13 +643,10 @@ fi
 sleep 3
 
     # Step 8: Install Hakrawler
+python3 -m venv .venv
+source .venv/bin/activate 
 show_progress "Installing Hakrawler"
 
-# Ensure Go is installed
-if ! command -v go &> /dev/null; then
-    echo -e "${RED}Go is not installed. Please install Go before proceeding.${NC}"
-    exit 1
-fi
 
 # Attempt to install Hakrawler using 'go install'
 echo -e "${BOLD_WHITE}Attempting to install Hakrawler using 'go install'...${NC}"
@@ -656,13 +692,10 @@ sleep 3
 
 
 # Step 8.1: Install URLFinder
+python3 -m venv .venv
+source .venv/bin/activate 
 show_progress "Installing URLFinder"
 
-# Ensure Go is installed
-if ! command -v go &> /dev/null; then
-    echo -e "${RED}Go is not installed. Please install Go before proceeding.${NC}"
-    exit 1
-fi
 
 # Attempt to install URLFinder using 'go install'
 echo -e "${BOLD_WHITE}Attempting to install URLFinder using 'go install'...${NC}"
@@ -709,13 +742,10 @@ sleep 3
 
 
     # Step 9: Install Katana
+python3 -m venv .venv
+source .venv/bin/activate 
 show_progress "Installing Katana"
 
-# Ensure Go is installed
-if ! command -v go &> /dev/null; then
-    echo -e "${RED}Go is not installed. Please install Go before proceeding.${NC}"
-    exit 1
-fi
 
 # Attempt to install Katana using 'go install'
 echo -e "${BOLD_WHITE}Attempting to install Katana using 'go install'...${NC}"
@@ -760,27 +790,11 @@ fi
 sleep 3
 
 
-    # Step 11: Install Gau
-    show_progress "Installing Gau"
-
-    # Detect the current user's home directory
-    if [ "$EUID" -eq 0 ]; then
-        echo "Detected root user."
-        HOME_DIR="/root"
-    else
-        echo "Detected non-root user."
-        USERNAME=$(whoami)
-        HOME_DIR="/home/$USERNAME"
-    fi
-
     #  Install Gau
+python3 -m venv .venv
+source .venv/bin/activate 
 show_progress "Installing Gau"
 
-# Ensure Go is installed
-if ! command -v go &> /dev/null; then
-    echo -e "${RED}Go is not installed. Please install Go before proceeding.${NC}"
-    exit 1
-fi
 
 # Attempt to install Gau using 'go install'
 echo -e "${BOLD_WHITE}Attempting to install Gau using 'go install'...${NC}"
@@ -812,6 +826,8 @@ else
 fi
 
 # Attempt to install Katana using 'go install'
+python3 -m venv .venv
+source .venv/bin/activate 
 echo -e "${BOLD_WHITE}Attempting to install Katana using 'go install'...${NC}"
 if go install github.com/projectdiscovery/katana/cmd/katana@latest; then
     echo -e "${BOLD_BLUE}Katana installed successfully via 'go install'.${NC}"
@@ -841,6 +857,8 @@ else
 fi
 
 # Attempt to install Waybackurls using 'go install'
+python3 -m venv .venv
+source .venv/bin/activate 
 echo -e "${BOLD_WHITE}Attempting to install Waybackurls using 'go install'...${NC}"
 if go install github.com/tomnomnom/waybackurls@latest; then
     echo -e "${BOLD_BLUE}Waybackurls installed successfully via 'go install'.${NC}"
@@ -874,19 +892,6 @@ fi
 if [[ ":$PATH:" != *":/usr/local/bin:"* ]]; then
     export PATH="$PATH:/usr/local/bin"
 fi
-
-# Create a .gau.toml configuration file in the user's home directory
-echo -e "${BOLD_WHITE}Configuring Gau...${NC}"
-cat <<EOF > "$HOME/.gau.toml"
-[gau]
-wayback = true
-commoncrawl = true
-otx = false
-EOF
-
-# Set appropriate permissions for the .gau.toml file
-sudo chown "$USER":"$USER" "$HOME/.gau.toml"
-sudo chmod 644 "$HOME/.gau.toml"
 
 # Confirm installation and configuration
 if command -v gau &> /dev/null; then
@@ -1075,6 +1080,7 @@ setup_and_activate_venv
 # Function to run step 3 (Domain Enumeration and Filtering)
 run_step_3() {
     # Check if the user wants to skip the order check for step 3
+    source "$(pwd)/.venv/bin/activate"
     if [ "$skip_order_check_for_option_4" = true ]; then
         echo -e "${BOLD_BLUE}Skipping step 3 order check and directly using the domain list provided...${NC}"
         if [ -f "${domain_name}-domains.txt" ]; then
@@ -1102,6 +1108,8 @@ run_step_3() {
             if [[ "$continue_scan" =~ ^[Yy]$ ]]; then
                 # Step xx: Filtering ALIVE DOMAINS
                 show_progress "Filtering ALIVE DOMAINS"
+                python3 -m venv .venv
+                source .venv/bin/activate 
                 subprober -f "${domain_name}-domains.txt" -sc -ar -o "${domain_name}-alive" -nc -c 20 || handle_error "subprober"
                 sleep 5
                 rm -r "${domain_name}-domains.txt"
@@ -1124,7 +1132,7 @@ run_step_3() {
                 mv "subs-filtered.txt" "${domain_name}-domains.txt"
                 echo -e "${RED}Removed $removed_count duplicate domains.${NC}"
 
-                # Normalize to `http://` and remove `www.`
+                # Step xx: Normalize to `http://` and remove `www.`
                 awk '{sub(/^https?:\/\//, "http://", $0); sub(/^http:\/\/www\./, "http://", $0); domain = $0; if (!seen[domain]++) print domain}' \
                 "${domain_name}-domains.txt" > "final-${domain_name}-domains.txt" || handle_error "Final filtering"
                 rm -r "${domain_name}-domains.txt"
@@ -1146,11 +1154,15 @@ run_step_3() {
     elif [[ "$user_choice" == "N" ]]; then
         # Step 1: Passive FUZZ domains with wordlist
         show_progress "Passive FUZZ domains with wordlist"
+        python3 -m venv .venv
+        source .venv/bin/activate 
         dnsbruter -d "$domain_name" -w subs-dnsbruter-small.txt -c 150 -wt 80 -rt 500 -wd -ws wild.txt -o output-dnsbruter.txt || handle_error "dnsbruter"
         sleep 5
 
         # Step 2: Active brute crawling domains
         show_progress "Active brute crawling domains"
+        python3 -m venv .venv
+        source .venv/bin/activate 
         subdominator -d "$domain_name" -o output-subdominator.txt || handle_error "subdominator"
         sleep 5
 
@@ -1213,212 +1225,15 @@ show_progress "Filtering ALIVE domain names"
 subprober -f "unique-${domain_name}-domains.txt" -sc -ar -o "subprober-${domain_name}-domains.txt" -nc -c 20 || handle_error "subprober"
 sleep 5
 
-# Step 7.1: Create subs-subs folder and set permissions
-output_folder="subs-subs"
-if [[ ! -d "$output_folder" ]]; then
-    echo "Creating output folder $output_folder..."
-    sudo mkdir "$output_folder"
-fi
-sudo chmod 777 "$output_folder"
-
-# Step 7.2: Normalize domains from subprober output and save to normalized-cleaned.txt in subs-subs
-show_progress "Normalizing domains to remove prefixes, status codes, and special characters"
-input_file="subprober-${domain_name}-domains.txt"
-normalized_file="$output_folder/normalized-cleaned.txt"
-temp_file=$(mktemp)
-
-while IFS= read -r line || [[ -n "$line" ]]; do
-    # Remove http:// and https:// prefixes
-    cleaned_line=$(echo "$line" | sed -E 's/^https?:\/\///')
-    # Remove status codes enclosed in brackets (e.g., [200])
-    cleaned_line=$(echo "$cleaned_line" | sed -E 's/\[[0-9]{3}\]//g')
-    # Trim whitespace and remove special characters
-    cleaned_line=$(echo "$cleaned_line" | xargs | grep -oP '^[a-zA-Z0-9.-]+$')
-    # Append cleaned domain to the new file if not empty
-    if [[ -n "$cleaned_line" ]]; then
-        echo "$cleaned_line" >> "$temp_file"
-    fi
-done < "$input_file"
-
-if [[ ! -s "$temp_file" ]]; then
-    echo "Error: No valid domains found after normalization."
-    exit 1
-fi
-
-# Determine the current working directory
-current_folder=$(pwd)
-
-# Save the normalized cleaned file in subs-subs folder
-sudo mv "$temp_file" "$normalized_file" || { echo "Error: Failed to save the normalized file. Ensure sudo privileges are available."; exit 1; }
-sudo chown "$(whoami):$(whoami)" "$normalized_file"
-sudo chmod +x "$normalized_file"
-echo "File '$normalized_file' has been created, ownership updated, and permissions set successfully."
-
-# Step 7.3: Remove duplicates directly from normalized-cleaned.txt
-show_progress "Removing duplicate domains"
-initial_count=$(wc -l < "$normalized_file")
-
-# Use a temporary file for deduplication
-temp_file=$(mktemp)
-awk '{if (!seen[$0]++) print}' "$normalized_file" > "$temp_file" || handle_error "Removing duplicates"
-
-# Overwrite the original file with the deduplicated content
-sudo mv "$temp_file" "$normalized_file" || { echo "Error: Failed to update the normalized file. Ensure sudo privileges are available."; exit 1; }
-sudo chown "$(whoami):$(whoami)" "$normalized_file"
-sudo chmod +x "$normalized_file"
-
-final_count=$(wc -l < "$normalized_file")
-removed_count=$((initial_count - final_count))
-echo -e "${RED}Removed $removed_count duplicate domains.${NC}"
-
-# Show the total number of domains in the current normalized file
-echo -e "${BOLD_BLUE}Current normalized file contains: ${final_count} domains.${NC}"
-
-# Step 7.4: Copy normalized file to the main folder and rename it to brut-${domain_name}-domains.txt
-brut_file="brut-${domain_name}-domains.txt"
-sudo cp "$normalized_file" "$brut_file" || { echo "Error: Failed to copy normalized file to the main folder. Ensure sudo privileges are available."; exit 1; }
-sudo chown "$(whoami):$(whoami)" "$brut_file"
-sudo chmod +x "$brut_file"
-
-# Update ownership and permissions for the current folder
-sudo chown -R "$(whoami):$(whoami)" "$current_folder"
-sudo chmod -R +x "$current_folder"
-echo "Ownership and execute permissions have been updated for the folder: $current_folder"
-
-
-# Step 7.5: Add BRUT. prefix to the domains
-show_progress "Performing enumeration subdomains of subdomains"
-temp_brut_file=$(mktemp)
-sudo chown "$(whoami):$(whoami)" "$temp_brut_file" || { echo "Error: Failed to set ownership for temporary BRUT file."; exit 1; }
-sudo chmod 600 "$temp_brut_file" || { echo "Error: Failed to set permissions for temporary BRUT file."; exit 1; }
-
-while IFS= read -r domain || [[ -n "$domain" ]]; do
-    echo "BRUT.$domain" >> "$temp_brut_file" || { echo "Error: Failed to write to temporary BRUT file."; exit 1; }
-done < "$brut_file"
-
-if [[ ! -s "$temp_brut_file" ]]; then
-    echo "Error: No domains to process in '$brut_file'."
-    exit 1
-fi
-
-# Overwrite the brut file with BRUT-prefixed domains
-sudo mv "$temp_brut_file" "$brut_file" || { echo "Error: Failed to overwrite '$brut_file' with BRUT-prefixed domains. Ensure sudo privileges are available."; exit 1; }
-sudo chown "$(whoami):$(whoami)" "$brut_file"
-sudo chmod +x "$brut_file"
-echo "File '$brut_file' created successfully with BRUT. prefix added to all valid domains."
-
-
-# Step 7.7: Run dnsbruter on the BRUT-prefixed domains
-wordlist_file="subs-dnsbruter-small.txt"
-
-if [[ ! -f "$wordlist_file" ]]; then
-    echo "Error: Wordlist file '$wordlist_file' not found."
-    exit 1
-fi
-
-processed_count=0
-total_domains=$(wc -l < "$brut_file")
-echo "Total domains to process: $total_domains"
-
-# Dynamically determine the default folder using pwd
-default_folder=$(pwd)
-brut_log="$default_folder/BRUT.log"
-> "$brut_log"  # Clear the BRUT.log file if it exists
-
-while IFS= read -r domain || [[ -n "$domain" ]]; do
-    domain=$(echo "$domain" | xargs)
-    if [[ -n "$domain" ]]; then
-        processed_count=$((processed_count + 1))
-        echo "Processing $processed_count/$total_domains: $domain"
-        output_file="$output_folder/output-${domain//BRUT/}.txt"
-        dnsbruter -d "$domain" -w "$wordlist_file" -c 150 -wt 80 -rt 500 -wd -ws wild.txt -o "$output_file" -ws "$output_folder/wild-${domain//BRUT/}.txt"
-        if [[ $? -ne 0 ]]; then
-            echo "Error occurred while running dnsbruter for $domain."
-        else
-            # Count and log new domains discovered by dnsbruter
-            new_domains_count=$(wc -l < "$output_file")
-            echo "BRUT for $domain discovered $new_domains_count new domains."
-            echo "[$domain] Discovered: $new_domains_count new domains" >> "$brut_log"
-            
-            echo "Completed dnsbruter for $domain. Output saved to $output_file"
-        fi
-    fi
-done < "$brut_file"
-
-# Step 7.8: Merge all files in subs-subs folder into subs-subs.txt (including all .txt files)
-cd "$output_folder" || { echo "Failed to enter folder $output_folder"; exit 1; }
-cat *.txt > "subs-subs.txt"
-
-# Step 7.9: Remove duplicates from subs-subs.txt
-show_progress "Removing duplicate domains in subs-subs.txt"
-initial_count=$(wc -l < "subs-subs.txt")
-awk '{if (!seen[$0]++) print}' "subs-subs.txt" > "subs-filtered.txt" || handle_error "Removing duplicates"
-final_count_subs=$(wc -l < "subs-filtered.txt")
-removed_count=$((initial_count - final_count_subs))
-echo -e "${RED}Removed $removed_count duplicate domains.${NC}"
-
-# Replace subs-subs.txt with the filtered version
-sudo rm -r "subs-subs.txt"
-sudo mv "subs-filtered.txt" "subs-subs.txt"
-
-# Compare new domains in subs-subs.txt with the normalized file
-new_domains=$((final_count_subs - final_count))
-echo -e "${BOLD_BLUE}Current subs-subs.txt contains: ${final_count_subs} domains.${NC}"
-echo -e "${CYAN}Number of new SUB-SUB domains added since normalization: ${new_domains}${NC}"
-
-# Step 7.10: Move the final subs-subs.txt file to the default folder
-cd ..
-sudo mv "$output_folder/subs-subs.txt" "$default_folder/subs-subs.txt"
-echo "Final file 'subs-subs.txt' moved to the default folder."
-
-# Step 7.11: Log message confirming BRUT.log saved to the default folder
-if [[ -f "$brut_log" ]]; then
-    echo "BRUT.log has been created and saved to the default folder: $default_folder"
-fi
-
-# Count and display the total number of subdomains found
-total_subdomains=$(wc -l < "subs-subs.txt")
-echo -e "${BOLD_BLUE}Total subdomains found: ${total_subdomains}${NC}"
-
-# Step 7.11: Remove old subprober domains file
-show_progress "Removing old subprober domains file"
-rm -r "subprober-${domain_name}-domains.txt" || handle_error "Removing old subprober domains file"
-sleep 3
-
-
-# Step 2xSubprober: Filtering ALIVE domain names
-show_progress "Filtering ALIVE domain names"
-
-# Optimize SubProber execution with reduced concurrency and thread count
-subprober -f subs-subs.txt -sc -ar -o "subprober-${domain_name}-domains.txt" -nc -c 20 || handle_error "subprober"
-
-# Sleep to allow the system to stabilize after intensive processing
-sleep 5
-
-
-# Verify if the output file was created successfully
-if [[ -f "subprober-${domain_name}-domains.txt" ]]; then
-    echo "ALIVE domains successfully filtered and saved to subprober-${domain_name}-domains.txt"
-else
-    echo "Error: Output file 'subprober-${domain_name}-domains.txt' not created. Please check the logs for details."
-    exit 1
-fi
-
-# Step 2y: Replacing subs-subs.txt with filtered subprober domains
-sudo rm -r subs-subs.txt
-sudo mv "subprober-${domain_name}-domains.txt" subs-subs.txt
-echo "Replaced 'subs-subs.txt' with filtered subprober domains."
-sleep 5
 
 # Step 2y1: Filtering valid domain names
 show_progress "Filtering valid domain names"
-grep -oP 'http[^\s]*' "subs-subs.txt" > output-domains.txt || handle_error "grep valid domains"
+grep -oP 'http[^\s]*' "subprober-${domain_name}-domains.txt" > output-domains.txt || handle_error "grep valid domains"
 sleep 3
 
-# Step 2y2: Replacing subs-subs.txt with valid domains
-sudo rm -r subs-subs.txt
+# Step 2y2: Replacing with valid domains
 sudo mv output-domains.txt subs-subs.txt
-echo "Replaced 'subs-subs.txt' with valid domain names."
+echo "Replaced 'old' with valid domain names."
 sleep 3
 
 
@@ -1451,11 +1266,7 @@ echo -e "${BOLD_RED}Enumeration and filtering process completed successfully. Fi
 
 # Step 10.1: Deleting all unwanted files
 show_progress "Deleting all unwanted files"
-sudo rm -r "brut-${domain_name}-domains.txt" "unique-${domain_name}-domains.txt" subs-subs || echo "Some files could not be deleted. Please check permissions."
-echo "Deleted the following files:"
-echo "- brut-${domain_name}-domains.txt"
-echo "- unique-${domain_name}-domains.txt"
-echo "- subs-subs folder"
+sudo rm -r "unique-${domain_name}-domains.txt" || echo "Some files could not be deleted. Please check permissions."
 sleep 3
 
 
@@ -1713,7 +1524,9 @@ run_step_5() {
 
     # Step 24: Filtering ALIVE URLS
     show_progress "Filtering ALIVE URLS"
-    subprober -f "${domain_name}-links.txt" -sc -ar -o "${domain_name}-links.txt1337" -nc -mc 200,201,202,204,301,302,304,307,308,403,500,504,401,407 -c 20 || handle_error "subprober"
+    python3 -m venv .venv
+    source .venv/bin/activate 
+    subprober -f "${domain_name}-links.txt" -sc -ar -o "${domain_name}-links-alive.txt" -nc -mc 200,201,202,204,301,302,304,307,308,403,500,504,401,407 -c 20 || handle_error "subprober"
     sleep 5
 
     # Step 25: Removing old file
@@ -1723,13 +1536,13 @@ run_step_5() {
 
     # Step 26: Filtering valid URLS
     show_progress "Filtering valid URLS"
-    grep -oP 'http[^\s]*' "${domain_name}-links.txt1337" > ${domain_name}-links.txt1338 || handle_error "grep valid urls"
+    grep -oP 'http[^\s]*' "${domain_name}-links-alive.txt" > ${domain_name}-links-valid.txt || handle_error "grep valid urls"
     sleep 5
 
     # Step 27: Removing intermediate file and renaming final output
     show_progress "Final cleanup and renaming"
-    rm -r ${domain_name}-links.txt1337
-    mv ${domain_name}-links.txt1338 ${domain_name}-links.txt
+    rm -r ${domain_name}-links-alive.txt
+    mv ${domain_name}-links-valid.txt ${domain_name}-links.txt
     sleep 3
 
     echo -e "${BOLD_BLUE}Filtering process completed successfully. Final output saved as ${domain_name}-links.txt.${NC}"
@@ -2081,6 +1894,14 @@ if [ -f "reflection.py" ]; then
             echo -e "${BOLD_WHITE}Initial Total Merged URLs in the beginning : ${RED}${total_merged_urls}${NC}"
             echo -e "${BOLD_WHITE}Filtered Final URLs for XSS Testing: ${RED}${total_urls}${NC}"
 
+            #Sorting URLs for xss0r:
+            echo -e "${BOLD_BLUE}Sorting valid format URLs for xss0r...${NC}"
+            awk '{sub("http://", "http://www."); sub("https://", "https://www."); print}' xss-urls.txt | sort -u > sorted-xss-urls.txt
+            rm -r xss-urls.txt
+            mv sorted-xss-urls.txt xss-urls.txt
+            sleep 5
+
+
             # Automatically run the xss0r command after reflection step
             ./xss0r --get --urls xss-urls.txt --payloads payloads.txt --shuffle --threads 10 --path || handle_error "Launching xss0r Tool"
         fi
@@ -2265,12 +2086,171 @@ run_path_based_xss() {
     fi
 }
 
-# Main script logic
+# Function to handle script interruption
+trap_interrupt() {
+    echo -e "\n${RED}Script interrupted. Exiting.${NC}"
+    exit 1
+}
+
+# Trap SIGINT (Ctrl+C)
+trap trap_interrupt SIGINT
+
+# Function for Domains Search Input with Query Appending
+run_domains_search_input() {
+    echo -e "${BOLD_WHITE}You selected: Domains Search Input with Query Appending${NC}"
+
+    # Define search queries
+    domains_queries=(
+        "search?q=aaa"
+        "?query=aaa"
+        "en-us/Search#/?search=aaa"
+        "Search/Results?q=aaa"
+        "q=aaa"
+        "search.php?query=aaa"
+        "en-us/search?q=aaa"
+        "s=aaa"
+        "find?q=aaa"
+        "result?q=aaa"
+        "query?q=aaa"
+        "search?term=aaa"
+        "search?query=aaa"
+        "search?keywords=aaa"
+        "search?text=aaa"
+        "search?word=aaa"
+        "find?query=aaa"
+        "result?query=aaa"
+        "search?input=aaa"
+        "search/results?query=aaa"
+        "search-results?q=aaa"
+        "search?keyword=aaa"
+        "results?query=aaa"
+        "search?search=aaa"
+        "search?searchTerm=aaa"
+        "search?searchQuery=aaa"
+        "search?searchKeyword=aaa"
+        "search.php?q=aaa"
+        "search/?query=aaa"
+        "search/?q=aaa"
+        "search/?search=aaa"
+        "search.aspx?q=aaa"
+        "search.aspx?query=aaa"
+        "search.asp?q=aaa"
+        "index.asp?id=aaa"
+        "dashboard.asp?user=aaa"
+        "blog/search/?query=aaa"
+        "pages/searchpage.aspx?id=aaa"
+        "search.action?q=aaa"
+        "search.json?q=aaa"
+        "search/index?q=aaa"
+        "lookup?q=aaa"
+        "browse?q=aaa"
+        "search-products?q=aaa"
+        "products/search?q=aaa"
+        "news?q=aaa"
+        "articles?q=aaa"
+        "content?q=aaa"
+        "explore?q=aaa"
+        "search/advanced?q=aaa"
+        "search-fulltext?q=aaa"
+        "products?query=aaa"
+        "search?product=aaa"
+        "catalog/search?q=aaa"
+        "store/search?q=aaa"
+        "shop?q=aaa"
+        "items?query=aaa"
+        "search?q=aaa&category=aaa"
+        "store/search?term=aaa"
+        "marketplace?q=aaa"
+        "blog/search?q=aaa"
+        "news?query=aaa"
+        "articles?search=aaa"
+        "topics?q=aaa"
+        "stories?q=aaa"
+        "newsfeed?q="
+        "search-posts?q=aaa"
+        "blog/posts?q=aaa"
+        "search/article?q=aaa"
+        "/api/search?q=aaa"
+        "en/search/explore?q=aaa"
+        "bs-latn-ba/Search/Results?q=aaa"
+        "en-us/marketplace/apps?search=aaa"
+        "v1/search?q=aaa"
+        "search/node?keys=aaaa"
+        "api/v1/search?q=aaa"
+    )
+
+    normalize_domain() {
+        local domain="$1"
+        domain=$(echo "$domain" | tr '[:upper:]' '[:lower:]' | sed 's/^http:\/\///' | sed 's/^https:\/\///' | sed 's/^www\.//')
+        echo "http://$domain"
+    }
+
+    append_and_save() {
+        local domain="$1"
+        local output_file="$2"
+        normalized_domain=$(normalize_domain "$domain")
+        for query in "${domains_queries[@]}"; do
+            if [[ $query == /* ]]; then
+                echo "$normalized_domain$query" >> "$output_file"
+            else
+                echo "$normalized_domain/$query" >> "$output_file"
+            fi
+        done
+    }
+
+    # Prompt for domains file
+    read -p "Enter the path to your domains .txt file: " domains_file
+    if [[ ! -f $domains_file ]]; then
+        echo -e "${RED}The file does not exist - Please use your domains file from step 3.${NC}"
+        return
+    fi
+
+    # Prepare output file
+    output_file="appended-domains.txt"
+    > "$output_file"
+
+    echo -e "${BOLD_BLUE}Processing domains from $domains_file and appending queries...${NC}"
+
+    # Process each domain and append queries
+    while IFS= read -r domain || [[ -n "$domain" ]]; do
+        append_and_save "$domain" "$output_file"
+    done < "$domains_file"
+
+    echo -e "${BOLD_GREEN}All domains appended with queries and saved to $output_file.${NC}"
+
+    # Run the reflection.py script
+    reflection_script="reflection.py"
+if [[ -f $reflection_script ]]; then
+    echo -e "${BOLD_BLUE}Formatting URLs in $output_file to http://www format...${NC}"
+    
+    # Preprocess $output_file to ensure all URLs are in the http://www format
+    temp_file="formatted_$output_file"
+    awk -F'://' '{print "http://www." $2}' "$output_file" > "$temp_file"
+    
+    # Replace the original file with the formatted version
+    mv "$temp_file" "$output_file"
+    
+    echo -e "${BOLD_GREEN}URLs formatted successfully.${NC}"
+    echo -e "${BOLD_BLUE}Running reflection.py on $output_file...${NC}"
+    sudo python3 "$reflection_script" "$output_file" --threads 3
+    echo -e "${BOLD_GREEN}Reflection done, new domains saved in the file xss.txt.${NC}"
+
+        # Run the xss0r command
+        if [[ -x ./xss0r ]]; then
+            echo -e "${BOLD_BLUE}Running xss0r Tool:${NC}"
+            ./xss0r --get --urls xss.txt --payloads payloads.txt --shuffle --threads 10
+        else
+            echo -e "${RED}xss0r executable not found in the current directory.${NC}"
+        fi
+    else
+        echo -e "${RED}Reflection script $reflection_script not found.${NC}"
+    fi
+}
 
 while true; do
     # Display options
     display_options
-    read -p "Enter your choice [1-11]: " choice
+    read -p "Enter your choice [1-12]: " choice
 
     # Check if the selected option is in the correct order
     if [[ $choice -ge 2 && $choice -le 8 && $choice -ne 4 ]]; then
@@ -2356,9 +2336,13 @@ while true; do
             echo -e "${BOLD_WHITE}You selected: Guide to Deploying xss0r on VPS Servers${NC}"
             show_vps_info
             ;;
-        11) # Execute Path-based XSS
+       11) # Execute Path-based XSS
             run_path_based_xss
             last_completed_option=11
+            ;;
+        12) # Domains Search Input
+            run_domains_search_input
+            last_completed_option=12
             ;;
         *)
             echo "Invalid option. Please select a number between 1 and 11."
